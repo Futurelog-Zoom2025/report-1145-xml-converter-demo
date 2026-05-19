@@ -3,41 +3,16 @@
 // Flow:
 //   1. User drops/selects a .xml file
 //   2. Parser extracts rows + validity metadata
-//   3. If filename matches the forward-generator pattern, decode and show
-//      Division / Supplier / Date as an info block (no preview table)
-//   4. Show Full Data button opens the shared modal
-//   5. Download button writes the Report 1145 .xlsx
+//   3. Decoded-from-filename card shows Division/Supplier/Date when the
+//      filename matches the forward-generator pattern, or a red reason
+//      message when it doesn't
+//   4. Download button writes the Report 1145 .xlsx
 
 import { parseFuturelogXml } from "./xmlParser.js";
 import { buildReport1145Xlsx } from "./r1145Writer.js";
 import {
   $, escapeHtml, formatBytes, runWithLoading, downloadBlob,
 } from "./shared.js";
-import { openFullDataModal } from "./fullDataModal.js";
-
-// Full Data modal columns — everything we extracted from the XML.
-const FULL_COLS = [
-  { key: "pos",          label: "#" },
-  { key: "itemNo",       label: "Article no." },
-  { key: "ean",          label: "EAN / GTIN" },
-  { key: "manArtId",     label: "Mfg item no" },
-  { key: "descDE",       label: "Name (DE)" },
-  { key: "descFR",       label: "Name (FR)" },
-  { key: "descIT",       label: "Name (IT)" },
-  { key: "descGB",       label: "Name (GB)" },
-  { key: "descExtra",    label: "Name (Local)" },
-  { key: "ou",           label: "OU" },
-  { key: "cu",           label: "CU" },
-  { key: "cuou",         label: "CU/OU" },
-  { key: "priceOU",      label: "Price (PRCOU)" },
-  { key: "origin",       label: "Origin" },
-  { key: "customsNo",    label: "Customs no" },
-  { key: "availability", label: "Lead time (VLZ)" },
-  { key: "specUrl",      label: "Spec URL" },
-  { key: "offerStart",   label: "Offer start" },
-  { key: "offerEnd",     label: "Offer end" },
-  { key: "customerId",   label: "Customer ID" },
-];
 
 const MONTH_NAMES_EN = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -124,7 +99,6 @@ export function initXmlToR1145Tab() {
     decodedSupplier: $("#xmlDecodedSupplier"),
     decodedDate:     $("#xmlDecodedDate"),
     decodedError:    $("#xmlDecodedError"),
-    showFullBtn:     $("#xmlShowFullBtn"),
     actionCard:      $("#xmlActionCard"),
     generateBtn:     $("#xmlGenerateBtn"),
     genHint:         $("#xmlGenHint"),
@@ -302,16 +276,6 @@ export function initXmlToR1145Tab() {
 
   els.generateBtn.addEventListener("click", runGenerate);
   els.resetBtn.addEventListener("click", resetAll);
-
-  els.showFullBtn.addEventListener("click", () => {
-    openFullDataModal({
-      rows: state.rows,
-      columns: FULL_COLS,
-      invalidCells: new Map(),
-      exportFilename: "XML_to_R1145_Preview",
-      exportSheetName: "XML Rows",
-    });
-  });
 
   setGenerateReady("empty");
 }
