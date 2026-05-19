@@ -3,8 +3,10 @@
 // Flow:
 //   1. User drops/selects a .xml file
 //   2. Parser extracts rows + validity metadata
-//   3. Inline preview + Show Full Data modal
-//   4. Download button writes the Report 1145 .xlsx
+//   3. If filename matches the forward-generator pattern, decode and show
+//      Division / Supplier / Date as an info block (no preview table)
+//   4. Show Full Data button opens the shared modal
+//   5. Download button writes the Report 1145 .xlsx
 
 import { parseFuturelogXml } from "./xmlParser.js";
 import { buildReport1145Xlsx } from "./r1145Writer.js";
@@ -12,20 +14,6 @@ import {
   $, escapeHtml, formatBytes, runWithLoading, downloadBlob,
 } from "./shared.js";
 import { openFullDataModal } from "./fullDataModal.js";
-
-const PREVIEW_LIMIT = 10;
-
-// Inline preview columns — small subset, chosen to fit on screen without
-// horizontal scroll. The Full Data modal shows the complete set.
-const PREVIEW_COLS = [
-  { key: "pos",        label: "#",          cls: "c-pos" },
-  { key: "itemNo",     label: "Article",    cls: "c-art" },
-  { key: "descGB",     label: "Name (GB)",  cls: "c-en" },
-  { key: "ou",         label: "OU",         cls: "c-unit" },
-  { key: "priceOU",    label: "Price",      cls: "c-price" },
-  { key: "availability", label: "Lead",     cls: "c-avail" },
-  { key: "customerId", label: "Cust ID",    cls: "c-cust" },
-];
 
 // Full Data modal columns — everything we extracted from the XML.
 const FULL_COLS = [
@@ -51,6 +39,53 @@ const FULL_COLS = [
   { key: "customerId",   label: "Customer ID" },
 ];
 
+const MONTH_NAMES_EN = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+// Decode a filename matching the forward XML generator's output. Accepted:
+//   16911111120251202.cat.xml    ← exact forward-generator output
+//   16911111120251202_cat.xml    ← underscore variant (some renames)
+//   16911111120251202.xml        ← stripped variant
+//
+// Pattern: 3 digits (division) + 6 digits (supplier) + 8 digits (YYYYMMDD)
+// followed by ".cat.xml", "_cat.xml", or ".xml". Returns null when the
+// filename doesn't match (caller hides the decoded-info card in that case).
+function decodeFilename(name) {
+  if (typeof name !== "string" || name === "") return null;
+
+  const m = name.match(/^(\d{17})(?:[._]cat)?\.xml$/i);
+  if (!m) return null;
+
+  const body = m[1];
+  const division   = body.slice(0, 3);
+  const supplierNo = body.slice(3, 9);
+  const yyyy       = body.slice(9, 13);
+  const mm         = body.slice(13, 15);
+  const dd         = body.slice(15, 17);
+
+  // Validate month/day ranges so a 17-digit string that isn't actually a
+  // real date doesn't pretend to be one. Year range covers ongoing files.
+  const monthIdx = parseInt(mm, 10) - 1;
+  const day      = parseInt(dd, 10);
+  const year     = parseInt(yyyy, 10);
+  if (
+    monthIdx < 0 || monthIdx > 11 ||
+    day < 1 || day > 31 ||
+    year < 2000 || year > 2200
+  ) {
+    return null;
+  }
+
+  return {
+    division,
+    supplierNo,
+    yyyy, mm, dd,
+    dateHuman: `${dd} ${MONTH_NAMES_EN[monthIdx]} ${yyyy}`,
+  };
+}
+
 export function initXmlToR1145Tab() {
   const els = {
     dropZone:        $("#xmlDropZone"),
@@ -58,9 +93,10 @@ export function initXmlToR1145Tab() {
     fileInfo:        $("#xmlFileInfo"),
     status:          $("#xmlStatus"),
     resetBtn:        $("#xmlResetBtn"),
-    previewCard:     $("#xmlPreviewCard"),
-    previewSummary:  $("#xmlPreviewSummary"),
-    previewTable:    $("#xmlPreviewTable"),
+    decodedCard:     $("#xmlDecodedCard"),
+    decodedDivision: $("#xmlDecodedDivision"),
+    decodedSupplier: $("#xmlDecodedSupplier"),
+    decodedDate:     $("#xmlDecodedDate"),
     showFullBtn:     $("#xmlShowFullBtn"),
     actionCard:      $("#xmlActionCard"),
     generateBtn:     $("#xmlGenerateBtn"),
@@ -71,9 +107,10 @@ export function initXmlToR1145Tab() {
     rows: [],
     validity: null,
     fileName: null,
+    decoded: null,
   };
 
-  // ───────────────────────── Helpers ─────────────────────────
+  // ─────────────── Helpers ───────────────
 
   function setStatus(kind, html) {
     els.status.className = `status ${kind}`;
@@ -101,16 +138,28 @@ export function initXmlToR1145Tab() {
     state.rows = [];
     state.validity = null;
     state.fileName = null;
+    state.decoded = null;
     els.fileInput.value = "";
     els.fileInfo.classList.add("hidden");
     els.fileInfo.innerHTML = "";
-    els.previewCard.classList.add("hidden");
+    els.decodedCard.classList.add("hidden");
     els.actionCard.classList.add("hidden");
     clearStatus();
     setGenerateReady("empty");
   }
 
-  // ─────────────────────── File handling ──────────────────────
+  function renderDecoded(decoded) {
+    if (!decoded) {
+      els.decodedCard.classList.add("hidden");
+      return;
+    }
+    els.decodedDivision.textContent = decoded.division;
+    els.decodedSupplier.textContent = decoded.supplierNo;
+    els.decodedDate.textContent     = decoded.dateHuman;
+    els.decodedCard.classList.remove("hidden");
+  }
+
+  // ─────────────── File handling ───────────────
 
   async function handleFile(file) {
     clearStatus();
@@ -129,6 +178,7 @@ export function initXmlToR1145Tab() {
 
       state.rows = rows;
       state.validity = validity;
+      state.decoded = decodeFilename(file.name);
 
       els.fileInfo.innerHTML = `
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;color:var(--success)"><path d="M20 6L9 17l-5-5"/></svg>
@@ -137,21 +187,26 @@ export function initXmlToR1145Tab() {
       `;
       els.fileInfo.classList.remove("hidden");
 
-      renderPreview(rows);
+      renderDecoded(state.decoded);
       els.actionCard.classList.remove("hidden");
-      setGenerateReady("ready");
+      setGenerateReady("ready", `${rows.length} row${rows.length === 1 ? "" : "s"} ready.`);
 
+      // Status message: surface XML validity only when filename didn't decode
+      // (otherwise the decoded card already shows the date prominently).
       setStatus("info",
         `<strong>Parsed.</strong> ${rows.length} article${rows.length === 1 ? "" : "s"} extracted` +
-        (validity.raw ? ` · validity ${escapeHtml(validity.dd || "")}/${escapeHtml(validity.mm || "")}/${escapeHtml(validity.yyyy || "")}` : "") +
+        (validity.raw && !state.decoded
+          ? ` · XML validity ${escapeHtml(validity.dd || "")}/${escapeHtml(validity.mm || "")}/${escapeHtml(validity.yyyy || "")}`
+          : "") +
         `. Click <em>Download Report 1145</em> below.`
       );
     } catch (err) {
       console.error(err);
       state.rows = [];
       state.validity = null;
+      state.decoded = null;
       els.fileInfo.classList.add("hidden");
-      els.previewCard.classList.add("hidden");
+      els.decodedCard.classList.add("hidden");
       els.actionCard.classList.add("hidden");
       setGenerateReady("empty");
       setStatus("error",
@@ -160,36 +215,7 @@ export function initXmlToR1145Tab() {
     }
   }
 
-  // ─────────────────────── Preview ─────────────────────────────
-
-  function displayValue(v) {
-    if (v === null || v === undefined) return "";
-    if (typeof v === "number") {
-      return Number.isInteger(v) ? String(v) : v.toFixed(2);
-    }
-    return String(v);
-  }
-
-  function renderPreview(rows) {
-    const showRows = rows.slice(0, PREVIEW_LIMIT);
-    const head = `<thead><tr>${PREVIEW_COLS.map((c) => `<th class="${c.cls}">${c.label}</th>`).join("")}</tr></thead>`;
-    const body = "<tbody>" + showRows.map((r) => {
-      return "<tr>" + PREVIEW_COLS.map((c) => {
-        const v = r[c.key];
-        const shown = displayValue(v);
-        return `<td class="${c.cls}" title="${escapeHtml(shown)}">${escapeHtml(shown)}</td>`;
-      }).join("") + "</tr>";
-    }).join("") + "</tbody>";
-    els.previewTable.innerHTML = head + body;
-
-    els.previewSummary.textContent =
-      rows.length > PREVIEW_LIMIT
-        ? `Showing first ${PREVIEW_LIMIT} of ${rows.length} rows.`
-        : `Showing all ${rows.length} row${rows.length === 1 ? "" : "s"}.`;
-    els.previewCard.classList.remove("hidden");
-  }
-
-  // ─────────────────────── Generate ────────────────────────────
+  // ─────────────── Generate ───────────────
 
   async function runGenerate() {
     if (state.rows.length === 0) return;
@@ -208,7 +234,7 @@ export function initXmlToR1145Tab() {
     );
   }
 
-  // ─────────────────────── Event wiring ────────────────────────
+  // ─────────────── Event wiring ───────────────
 
   els.dropZone.addEventListener("click", () => els.fileInput.click());
   els.dropZone.addEventListener("dragover", (e) => {
@@ -234,7 +260,7 @@ export function initXmlToR1145Tab() {
     openFullDataModal({
       rows: state.rows,
       columns: FULL_COLS,
-      invalidCells: new Map(),   // no validation on this tab — no error cells
+      invalidCells: new Map(),
       exportFilename: "XML_to_R1145_Preview",
       exportSheetName: "XML Rows",
     });
