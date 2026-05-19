@@ -1,14 +1,16 @@
 // Thin orchestrator: wires the tab switcher and initializes each tab module.
-// All real logic lives in tab1145.js and tabP2P.js.
+// All real logic lives in tab1145.js, tabP2P.js, and tabXmlToR1145.js.
 
 import { initR1145Tab } from "./tab1145.js";
 import { initP2PTab } from "./tabP2P.js";
+import { initXmlToR1145Tab } from "./tabXmlToR1145.js";
 
 // ---------- Tab switching ----------
 const tabs = document.querySelectorAll(".tabs .tab");
 const panels = {
   r1145: document.getElementById("panel1145"),
   p2p:   document.getElementById("panelP2P"),
+  xml:   document.getElementById("panelXml"),
 };
 
 tabs.forEach((tab) => {
@@ -25,8 +27,9 @@ tabs.forEach((tab) => {
   });
 });
 
-// ---------- Initialize both tabs up-front ----------
-// Both tabs are wired immediately so state is preserved when the user flips
-// between tabs. The inactive panel is just hidden via CSS, not unmounted.
+// ---------- Initialize all tabs up-front ----------
+// All tabs are wired immediately so state is preserved when the user flips
+// between tabs. Inactive panels are just hidden via CSS, not unmounted.
 initR1145Tab();
 initP2PTab();
+initXmlToR1145Tab();
