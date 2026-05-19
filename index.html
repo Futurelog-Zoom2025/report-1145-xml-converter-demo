@@ -285,19 +285,21 @@
           <div id="xmlStatus" class="status hidden"></div>
         </section>
 
-        <section class="card hidden" id="xmlPreviewCard">
-          <div class="preview-header">
-            <div>
-              <h2 style="margin-bottom:4px">Data Preview</h2>
-              <p class="muted small" id="xmlPreviewSummary" style="margin:0"></p>
+        <section class="card hidden" id="xmlDecodedCard">
+          <h2 style="margin-top:0">Decoded from filename</h2>
+          <div class="decoded-grid">
+            <div class="decoded-item">
+              <p class="decoded-label">Division</p>
+              <p class="decoded-value" id="xmlDecodedDivision">—</p>
             </div>
-            <button type="button" id="xmlShowFullBtn" class="btn btn-ghost btn-sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><path d="M3 8V3h5M21 8V3h-5M3 16v5h5M21 16v5h-5"/></svg>
-              Show Full Data
-            </button>
-          </div>
-          <div class="preview-table-wrap">
-            <table id="xmlPreviewTable" class="preview-table"></table>
+            <div class="decoded-item">
+              <p class="decoded-label">Supplier number</p>
+              <p class="decoded-value" id="xmlDecodedSupplier">—</p>
+            </div>
+            <div class="decoded-item">
+              <p class="decoded-label">Validity date</p>
+              <p class="decoded-value" id="xmlDecodedDate">—</p>
+            </div>
           </div>
         </section>
 
@@ -308,6 +310,10 @@
           </p>
           <div class="generate-row">
             <button id="xmlGenerateBtn" class="btn btn-primary" disabled>Download Report 1145.xlsx</button>
+            <button type="button" id="xmlShowFullBtn" class="btn btn-ghost btn-sm">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><path d="M3 8V3h5M21 8V3h-5M3 16v5h5M21 16v5h-5"/></svg>
+              Show Full Data
+            </button>
             <p id="xmlGenHint" class="gen-hint">Upload an XML file first.</p>
           </div>
         </section>
