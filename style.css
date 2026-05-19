@@ -129,6 +129,21 @@ body {
   font-weight: 500;
   color: var(--text);
 }
+.decoded-value.empty {
+  color: var(--muted);
+  font-style: italic;
+  font-weight: 400;
+}
+.decoded-error {
+  margin: 16px 0 0;
+  padding: 10px 12px;
+  background: var(--error-bg);
+  border: 1px solid #f5c6c2;
+  border-radius: 6px;
+  color: var(--error);
+  font-size: 13px;
+  line-height: 1.4;
+}
 @media (max-width: 600px) {
   .decoded-grid {
     grid-template-columns: 1fr;
