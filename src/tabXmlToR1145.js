@@ -50,13 +50,36 @@ const MONTH_NAMES_EN = [
 //   16911111120251202.xml        ← stripped variant
 //
 // Pattern: 3 digits (division) + 6 digits (supplier) + 8 digits (YYYYMMDD)
-// followed by ".cat.xml", "_cat.xml", or ".xml". Returns null when the
-// filename doesn't match (caller hides the decoded-info card in that case).
+// followed by ".cat.xml", "_cat.xml", or ".xml".
+//
+// Returns an object describing the result. When the filename matches, the
+// object carries division/supplier/date fields. When it doesn't match, the
+// object carries a `reason` string explaining the specific failure so the
+// user understands why their file wasn't decoded (e.g. wrong digit count,
+// invalid date, missing .xml extension).
+//
+// Either way, the decoded card stays visible — empty values + the reason
+// when there's no match.
 function decodeFilename(name) {
-  if (typeof name !== "string" || name === "") return null;
+  if (typeof name !== "string" || name === "") {
+    return { ok: false, reason: "No filename provided." };
+  }
+
+  // Extension check first — gives a clearer error than a generic "no match".
+  if (!/\.xml$/i.test(name)) {
+    return { ok: false, reason: `Filename must end in ".xml" (got "${name}").` };
+  }
 
   const m = name.match(/^(\d{17})(?:[._]cat)?\.xml$/i);
-  if (!m) return null;
+  if (!m) {
+    return {
+      ok: false,
+      reason:
+        `Filename "${name}" doesn't follow the expected format. ` +
+        `Expected: 17 digits (3 division + 6 supplier + 8 date) followed by ` +
+        `".cat.xml", "_cat.xml", or ".xml".`,
+    };
+  }
 
   const body = m[1];
   const division   = body.slice(0, 3);
@@ -70,15 +93,18 @@ function decodeFilename(name) {
   const monthIdx = parseInt(mm, 10) - 1;
   const day      = parseInt(dd, 10);
   const year     = parseInt(yyyy, 10);
-  if (
-    monthIdx < 0 || monthIdx > 11 ||
-    day < 1 || day > 31 ||
-    year < 2000 || year > 2200
-  ) {
-    return null;
+  if (monthIdx < 0 || monthIdx > 11) {
+    return { ok: false, reason: `Filename "${name}" has an invalid month (${mm}). Expected 01-12.` };
+  }
+  if (day < 1 || day > 31) {
+    return { ok: false, reason: `Filename "${name}" has an invalid day (${dd}). Expected 01-31.` };
+  }
+  if (year < 2000 || year > 2200) {
+    return { ok: false, reason: `Filename "${name}" has an unrealistic year (${yyyy}). Expected 2000-2200.` };
   }
 
   return {
+    ok: true,
     division,
     supplierNo,
     yyyy, mm, dd,
@@ -97,6 +123,7 @@ export function initXmlToR1145Tab() {
     decodedDivision: $("#xmlDecodedDivision"),
     decodedSupplier: $("#xmlDecodedSupplier"),
     decodedDate:     $("#xmlDecodedDate"),
+    decodedError:    $("#xmlDecodedError"),
     showFullBtn:     $("#xmlShowFullBtn"),
     actionCard:      $("#xmlActionCard"),
     generateBtn:     $("#xmlGenerateBtn"),
@@ -149,14 +176,33 @@ export function initXmlToR1145Tab() {
   }
 
   function renderDecoded(decoded) {
-    if (!decoded) {
-      els.decodedCard.classList.add("hidden");
-      return;
-    }
-    els.decodedDivision.textContent = decoded.division;
-    els.decodedSupplier.textContent = decoded.supplierNo;
-    els.decodedDate.textContent     = decoded.dateHuman;
+    // The card is always shown after a file is uploaded — even when the
+    // filename doesn't match the expected pattern. In the mismatch case we
+    // leave the three values blank and surface a red reason message.
     els.decodedCard.classList.remove("hidden");
+
+    if (decoded && decoded.ok) {
+      els.decodedDivision.textContent = decoded.division;
+      els.decodedSupplier.textContent = decoded.supplierNo;
+      els.decodedDate.textContent     = decoded.dateHuman;
+      els.decodedDivision.classList.remove("empty");
+      els.decodedSupplier.classList.remove("empty");
+      els.decodedDate.classList.remove("empty");
+      els.decodedError.classList.add("hidden");
+      els.decodedError.textContent = "";
+    } else {
+      // Blank values with a muted em-dash. Adding the .empty class greys
+      // them out so they read as "not available" rather than broken.
+      els.decodedDivision.textContent = "—";
+      els.decodedSupplier.textContent = "—";
+      els.decodedDate.textContent     = "—";
+      els.decodedDivision.classList.add("empty");
+      els.decodedSupplier.classList.add("empty");
+      els.decodedDate.classList.add("empty");
+      els.decodedError.textContent =
+        (decoded && decoded.reason) || "Filename doesn't match the expected format.";
+      els.decodedError.classList.remove("hidden");
+    }
   }
 
   // ─────────────── File handling ───────────────
@@ -192,10 +238,11 @@ export function initXmlToR1145Tab() {
       setGenerateReady("ready", `${rows.length} row${rows.length === 1 ? "" : "s"} ready.`);
 
       // Status message: surface XML validity only when filename didn't decode
-      // (otherwise the decoded card already shows the date prominently).
+      // successfully (otherwise the decoded card already shows the date).
+      const filenameDecoded = state.decoded && state.decoded.ok;
       setStatus("info",
         `<strong>Parsed.</strong> ${rows.length} article${rows.length === 1 ? "" : "s"} extracted` +
-        (validity.raw && !state.decoded
+        (validity.raw && !filenameDecoded
           ? ` · XML validity ${escapeHtml(validity.dd || "")}/${escapeHtml(validity.mm || "")}/${escapeHtml(validity.yyyy || "")}`
           : "") +
         `. Click <em>Download Report 1145</em> below.`
