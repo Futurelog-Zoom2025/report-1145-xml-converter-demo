@@ -162,6 +162,12 @@ export function buildReport1145Xlsx(rows, opts = {}) {
   // the file has hundreds of articles.
   ws["!views"] = [{ state: "frozen", ySplit: 1 }];
 
+  // Enable autofilter on the header row so users can filter/sort columns
+  // directly in Excel. Range covers all header columns and all data rows.
+  const lastColLetter = XLSX.utils.encode_col(COLUMNS.length - 1);
+  const lastRow = aoa.length; // 1-indexed; header is row 1, data fills the rest
+  ws["!autofilter"] = { ref: `A1:${lastColLetter}${lastRow}` };
+
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Tabelle1");
 
