@@ -17,7 +17,39 @@
 // row themselves or adjust the parser. The output is for review/editing, not
 // necessarily round-trip.
 
-import * as XLSX from "xlsx";
+import XLSX from "xlsx-js-style";
+
+// FutureLog brand color (orange). Used for the header row fill in the
+// generated Excel file so the output feels visually connected to FutureLog
+// branding. If a different exact shade is needed, change FUTURELOG_ORANGE
+// here — the rest of the styling cascades from it.
+const FUTURELOG_ORANGE = "FFE87722";   // orange fill (Excel needs FF prefix for alpha)
+const HEADER_TEXT_DARK = "FF1A1A1A";   // near-black dark text for high contrast on orange
+
+// Reusable header cell style: bold dark text on FutureLog orange fill, with
+// thin border lines around each cell so the header reads as a clean block.
+const HEADER_STYLE = {
+  font: {
+    bold: true,
+    color: { rgb: HEADER_TEXT_DARK },
+    sz: 11,
+  },
+  fill: {
+    patternType: "solid",
+    fgColor: { rgb: FUTURELOG_ORANGE },
+  },
+  alignment: {
+    horizontal: "left",
+    vertical: "center",
+    wrapText: true,
+  },
+  border: {
+    top:    { style: "thin", color: { rgb: "FFB0B0B0" } },
+    bottom: { style: "thin", color: { rgb: "FFB0B0B0" } },
+    left:   { style: "thin", color: { rgb: "FFB0B0B0" } },
+    right:  { style: "thin", color: { rgb: "FFB0B0B0" } },
+  },
+};
 
 // Column order matching the standard Report 1145 template, plus Customer ID
 // at the end (column W / 23). Each entry maps a row-object key to the header
@@ -76,13 +108,20 @@ const COL_WIDTHS = [
  */
 export function buildReport1145Xlsx(rows, opts = {}) {
   // Build the array-of-arrays sheet content.
-  // Headers go in row 1, data starts at row 2 — no title row or blank
-  // spacer rows. Different from the original Report 1145 template (which
-  // had "Create import list (PRI)" + 2 blanks above the headers), but per
-  // the user's request for the XML→Excel output.
-  const aoa = [
-    COLUMNS.map((c) => c.label),
-  ];
+  // Headers go in row 1 (styled with FutureLog branding), data starts at row 2.
+  //
+  // xlsx-js-style accepts cell objects of the form { v, t, s } where:
+  //   v = the value to display
+  //   t = type indicator: "s" = string, "n" = number
+  //   s = style object (fonts, fills, borders, etc.)
+  // Plain string/number values without styling can be passed as-is.
+  const headerRow = COLUMNS.map((c) => ({
+    v: c.label,
+    t: "s",
+    s: HEADER_STYLE,
+  }));
+
+  const aoa = [headerRow];
 
   for (const r of rows) {
     aoa.push(COLUMNS.map((c) => {
@@ -95,6 +134,10 @@ export function buildReport1145Xlsx(rows, opts = {}) {
 
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   ws["!cols"] = COL_WIDTHS.map((w) => ({ wch: w }));
+
+  // Freeze the header row so it stays visible while scrolling — useful when
+  // the file has hundreds of articles.
+  ws["!views"] = [{ state: "frozen", ySplit: 1 }];
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Tabelle1");
