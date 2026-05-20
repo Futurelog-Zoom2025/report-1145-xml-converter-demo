@@ -19,36 +19,35 @@
 
 import XLSX from "xlsx-js-style";
 
-// FutureLog brand color (orange). Used for the header row fill in the
-// generated Excel file so the output feels visually connected to FutureLog
-// branding. If a different exact shade is needed, change FUTURELOG_ORANGE
-// here — the rest of the styling cascades from it.
-const FUTURELOG_ORANGE = "FFE87722";   // orange fill (Excel needs FF prefix for alpha)
-const HEADER_TEXT_DARK = "FF1A1A1A";   // near-black dark text for high contrast on orange
+// FutureLog brand orange — warmer/amber shade picked from the actual logo
+// (screenshot reference). Stays in the "FF" alpha-prefixed hex format that
+// Excel expects.
+const FUTURELOG_ORANGE = "FFF0A02E";   // amber-orange, matches FutureLog brand
+const HEADER_GRAY      = "FFD9D9D9";   // neutral gray for empty-data columns
+const HEADER_TEXT_DARK = "FF1A1A1A";   // near-black dark text for high contrast
 
-// Reusable header cell style: bold dark text on FutureLog orange fill, with
-// thin border lines around each cell so the header reads as a clean block.
-const HEADER_STYLE = {
-  font: {
-    bold: true,
-    color: { rgb: HEADER_TEXT_DARK },
-    sz: 11,
-  },
-  fill: {
-    patternType: "solid",
-    fgColor: { rgb: FUTURELOG_ORANGE },
-  },
-  alignment: {
-    horizontal: "left",
-    vertical: "center",
-    wrapText: true,
-  },
-  border: {
-    top:    { style: "thin", color: { rgb: "FFB0B0B0" } },
-    bottom: { style: "thin", color: { rgb: "FFB0B0B0" } },
-    left:   { style: "thin", color: { rgb: "FFB0B0B0" } },
-    right:  { style: "thin", color: { rgb: "FFB0B0B0" } },
-  },
+// Shared font/border/alignment used by both the orange ("has data") and gray
+// ("no data") header variants. Only the fill differs between them.
+const HEADER_FONT = { bold: true, color: { rgb: HEADER_TEXT_DARK }, sz: 11 };
+const HEADER_BORDER = {
+  top:    { style: "thin", color: { rgb: "FFB0B0B0" } },
+  bottom: { style: "thin", color: { rgb: "FFB0B0B0" } },
+  left:   { style: "thin", color: { rgb: "FFB0B0B0" } },
+  right:  { style: "thin", color: { rgb: "FFB0B0B0" } },
+};
+const HEADER_ALIGN = { horizontal: "left", vertical: "center", wrapText: true };
+
+const HEADER_STYLE_ORANGE = {
+  font: HEADER_FONT,
+  fill: { patternType: "solid", fgColor: { rgb: FUTURELOG_ORANGE } },
+  alignment: HEADER_ALIGN,
+  border: HEADER_BORDER,
+};
+const HEADER_STYLE_GRAY = {
+  font: HEADER_FONT,
+  fill: { patternType: "solid", fgColor: { rgb: HEADER_GRAY } },
+  alignment: HEADER_ALIGN,
+  border: HEADER_BORDER,
 };
 
 // Column order matching the standard Report 1145 template, plus Customer ID
@@ -108,17 +107,41 @@ const COL_WIDTHS = [
  */
 export function buildReport1145Xlsx(rows, opts = {}) {
   // Build the array-of-arrays sheet content.
-  // Headers go in row 1 (styled with FutureLog branding), data starts at row 2.
+  // Headers go in row 1, data starts at row 2.
+  //
+  // Header styling rule (per-column, per-file):
+  //   - "has data" columns get orange fill (FutureLog brand color)
+  //   - "all empty" columns get gray fill
+  //   - Columns intentionally blank (key === null) are always gray
+  //
+  // The detection runs once over the dataset before building the header so
+  // we can pick the right style for each cell. If a column had no data in
+  // this file but gets filled in a future file, it'll automatically switch
+  // to orange — no code change needed.
   //
   // xlsx-js-style accepts cell objects of the form { v, t, s } where:
   //   v = the value to display
   //   t = type indicator: "s" = string, "n" = number
   //   s = style object (fonts, fills, borders, etc.)
-  // Plain string/number values without styling can be passed as-is.
-  const headerRow = COLUMNS.map((c) => ({
+
+  // Step 1: detect which columns have at least one non-empty value
+  const columnHasData = COLUMNS.map((c) => {
+    if (c.key === null) return false;        // intentionally blank columns
+    for (const r of rows) {
+      const v = r[c.key];
+      if (v === null || v === undefined) continue;
+      // Treat empty strings as no data; everything else (incl. 0, 0.0) counts.
+      if (typeof v === "string" && v.trim() === "") continue;
+      return true;
+    }
+    return false;
+  });
+
+  // Step 2: build the styled header row using the detection result
+  const headerRow = COLUMNS.map((c, i) => ({
     v: c.label,
     t: "s",
-    s: HEADER_STYLE,
+    s: columnHasData[i] ? HEADER_STYLE_ORANGE : HEADER_STYLE_GRAY,
   }));
 
   const aoa = [headerRow];
