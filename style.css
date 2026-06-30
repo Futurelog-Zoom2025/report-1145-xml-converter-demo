@@ -1,11 +1,11 @@
 :root {
-  --bg: #f7f7f5;
+  --bg: #fff8f3;
   --surface: #ffffff;
-  --border: #e5e5e2;
+  --border: #e8ddd4;
   --text: #1a1a1a;
   --muted: #6b6b68;
-  --primary: #c96342;
-  --primary-hover: #b55533;
+  --primary: #f97316;
+  --primary-hover: #ea6c00;
   --success: #2f7a4b;
   --success-bg: #e8f3ec;
   --error: #b3261e;
@@ -36,12 +36,18 @@ body {
 .hero {
   text-align: center;
   margin-bottom: 40px;
+  padding: 32px 24px 28px;
+  background: linear-gradient(135deg, #fff3e8 0%, #fff8f3 60%, #ffffff 100%);
+  border-radius: var(--radius);
+  border: 1px solid #f5ddc8;
+  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.08);
 }
 .hero h1 {
   font-size: 32px;
-  font-weight: 600;
+  font-weight: 700;
   margin: 0 0 8px;
   letter-spacing: -0.02em;
+  color: #c25c00;
 }
 .hero .sub {
   color: var(--muted);
@@ -155,7 +161,7 @@ body {
   align-items: center;
   justify-content: center;
   width: 24px; height: 24px;
-  background: var(--text);
+  background: var(--primary);
   color: #fff;
   border-radius: 50%;
   font-size: 12px;
@@ -169,11 +175,11 @@ body {
   text-align: center;
   cursor: pointer;
   transition: all 0.15s;
-  background: #fafaf8;
+  background: #faf6f2;
 }
 .drop-zone:hover, .drop-zone.dragging {
   border-color: var(--primary);
-  background: #fef6f2;
+  background: #fff3e6;
 }
 .drop-zone p { margin: 6px 0; }
 .icon-lg { width: 40px; height: 40px; color: var(--muted); margin-bottom: 8px; }
@@ -222,7 +228,7 @@ input[type="text"], select {
 input:focus, select:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(201, 99, 66, 0.15);
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
 }
 input.invalid { border-color: var(--error); }
 
@@ -250,7 +256,7 @@ input.invalid { border-color: var(--error); }
 .multiselect-btn:focus, .multiselect.open .multiselect-btn {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(201, 99, 66, 0.15);
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
 }
 .multiselect-btn .caret-icon {
   width: 16px;
@@ -290,7 +296,7 @@ input.invalid { border-color: var(--error); }
   gap: 12px;
   padding: 8px 12px;
   border-bottom: 1px solid var(--border);
-  background: #fafaf8;
+  background: #faf6f2;
 }
 .link-btn {
   background: none;
@@ -318,7 +324,7 @@ input.invalid { border-color: var(--error); }
   font-size: 14px;
   font-weight: 400;
 }
-.multiselect-option:hover { background: #fafaf8; }
+.multiselect-option:hover { background: #faf6f2; }
 .multiselect-option input[type="checkbox"] {
   margin: 0;
   cursor: pointer;
@@ -409,7 +415,7 @@ input.invalid { border-color: var(--error); }
   table-layout: fixed;
 }
 .preview-table thead th {
-  background: #fafaf8;
+  background: #faf6f2;
   text-align: left;
   padding: 8px 6px;
   font-weight: 600;
@@ -430,7 +436,7 @@ input.invalid { border-color: var(--error); }
   vertical-align: top;
   line-height: 1.35;
 }
-.preview-table tbody tr:hover { background: #fafaf8; }
+.preview-table tbody tr:hover { background: #faf6f2; }
 
 /* Column widths tuned so that 13 columns fit in ~824px */
 .preview-table th.c-pos, .preview-table td.c-pos { width: 32px; text-align: right; color: var(--muted); }
@@ -555,7 +561,7 @@ td.warn-cell { background: #fdf3dc; }
 .search-input:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 2px rgba(201, 99, 66, 0.15);
+  box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.15);
 }
 .full-modal-body {
   flex: 1;
@@ -568,7 +574,7 @@ td.warn-cell { background: #fdf3dc; }
   font-size: 12px;
 }
 .full-table thead th {
-  background: #fafaf8;
+  background: #faf6f2;
   text-align: left;
   padding: 8px 10px;
   font-weight: 600;
@@ -591,7 +597,7 @@ td.warn-cell { background: #fdf3dc; }
   text-overflow: ellipsis;
   vertical-align: top;
 }
-.full-table tbody tr:hover { background: #fafaf8; }
+.full-table tbody tr:hover { background: #faf6f2; }
 
 /* Sortable column headers in the full-data modal */
 .full-table th.sortable {
@@ -614,7 +620,7 @@ td.warn-cell { background: #fdf3dc; }
 .full-table th.sortable:hover .sort-arrow { opacity: 0.7; }
 .full-table th.sortable.sorted {
   color: var(--primary);
-  background: #fef6f2;
+  background: #fff3e6;
 }
 .full-table th.sortable.sorted .sort-arrow {
   opacity: 1;
@@ -1046,7 +1052,7 @@ code {
 .status-filter:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(201, 99, 66, 0.15);
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
 }
 
 /* -------- News announcement modal (first-visit popup) -------- */
