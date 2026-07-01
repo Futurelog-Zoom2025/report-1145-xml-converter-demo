@@ -23,13 +23,43 @@ import { vbaRound } from "./makroParser.js";
 
 // Status labels carried on each merged row (single-status shape, like P2P).
 export const MAKRO_STATUS = {
-  MATCHED: "Price updated from Makro",
-  NO_INFO: "No Information",
+  MATCHED:      "Price updated from Makro",
+  NO_INFO:      "No Information",
+  DISCONTINUED: "Discontinued",
 };
 
 function r1145PriceOf(r) {
   const v = r?.priceOU;
   return typeof v === "number" && Number.isFinite(v) ? v : 0;
+}
+
+// A Makro row is "discontinued" when its สถานะ contains "discontinu"
+// (case-insensitive) — covers "Discontinue", "Discontinued", "DISCONTINUED",
+// etc. Anything else (active, blank, missing) is treated as normal/active.
+function isDiscontinued(makroRow) {
+  return String(makroRow?.status || "").trim().toLowerCase().includes("discontinu");
+}
+
+// The Makro-derived display columns (raw file values + VAT calc), shared by the
+// matched and discontinued row builders.
+function makroDisplayFields(makroRow) {
+  return {
+    // ----- Raw Makro columns (red in the full-data view) -----
+    __makroArtGroup:  makroRow.artGroup,
+    __makroName:      makroRow.itemName,
+    __makroExVat:     makroRow.srcExVat,         // ราคาขาย (Ex. VAT) — raw from file
+    __makroVat:       makroRow.vatAmt,           // VAT amount
+    __makroInVat:     makroRow.inVat,            // ราคาขาย (In. VAT)
+    __makroStatus:    makroRow.status,           // สถานะ
+    // ----- VAT calculation columns (yellow in the full-data view) -----
+    __makroVatPct:        makroRow.vatPct,        // H  VAT%
+    __makroPriceExVat:    makroRow.priceExVat,    // I  Price Exclude VAT
+    __makroPriceInVat:    makroRow.priceInVat,    // J  Price Include VAT
+    __makroDiffDecimal:   makroRow.diffDecimal,   // K  Diff (Decimal)
+    __makroExVatAdj:      makroRow.priceExVatAdj, // L  Price Exclude VAT(Adj)
+    __makroPriceInVatAdj: makroRow.priceInVatAdj, // M  Price Include VAT(Adj)
+    __makroCheckDiff:     makroRow.checkDiff,     // N  Check Diff
+  };
 }
 
 // Matched row: 1145 base with the Makro new price + lead time "1" overlaid.
@@ -55,23 +85,37 @@ function buildMatchedRow({ r1145Row, makroRow, pos }) {
     __oldPrice:   oldPrice,
     __newPrice:   newPrice,
     __diff:       oldPrice - newPrice,   // AC = old - new
-    // ----- Raw Makro columns (red in the full-data view) -----
-    __makroArtGroup:  makroRow.artGroup,
-    __makroName:      makroRow.itemName,
-    __makroExVat:     makroRow.srcExVat,         // ราคาขาย (Ex. VAT) — raw from file
-    __makroVat:       makroRow.vatAmt,           // VAT amount
-    __makroInVat:     makroRow.inVat,            // ราคาขาย (In. VAT)
-    __makroStatus:    makroRow.status,           // สถานะ
-    // ----- VAT calculation columns (yellow in the full-data view) -----
-    __makroVatPct:        makroRow.vatPct,        // H  VAT%
-    __makroPriceExVat:    makroRow.priceExVat,    // I  Price Exclude VAT
-    __makroPriceInVat:    makroRow.priceInVat,    // J  Price Include VAT
-    __makroDiffDecimal:   makroRow.diffDecimal,   // K  Diff (Decimal)
-    __makroExVatAdj:      makroRow.priceExVatAdj, // L  Price Exclude VAT(Adj)  ← new price basis
-    __makroPriceInVatAdj: makroRow.priceInVatAdj, // M  Price Include VAT(Adj)
-    __makroCheckDiff:     makroRow.checkDiff,     // N  Check Diff
+    ...makroDisplayFields(makroRow),
     status:   MAKRO_STATUS.MATCHED,
     __source: "matched",
+  };
+}
+
+// Discontinued row: the Makro code matched, but its สถานะ says Discontinue.
+// Per the business rule, DON'T apply the Makro price — keep the Report 1145
+// price and close the lead time to "0". Makro/VAT columns are still populated
+// (and highlighted) for reference, but __newPrice is left blank since nothing
+// was applied. Stays __source "matched" so the red/yellow column highlighting
+// still fires; the __discontinued flag drives the summary/warning counts.
+function buildDiscontinuedRow({ r1145Row, makroRow, pos }) {
+  const oldPrice = r1145PriceOf(r1145Row);
+  return {
+    ...r1145Row,
+    pos,
+    priceOU:      vbaRound(oldPrice, 2),   // keep the Report 1145 price
+    availability: "0",                     // close the lead time
+    leadTimeRaw:  "0",
+    __scaledPriceWasZero: false,
+    __scaledPriceWasBlank: false,
+    __priceBothBlank: false,
+    statuses: undefined,
+    __oldPrice:   oldPrice,
+    __newPrice:   "",                      // Makro price NOT applied
+    __diff:       "",
+    ...makroDisplayFields(makroRow),
+    status:   MAKRO_STATUS.DISCONTINUED,
+    __source: "matched",
+    __discontinued: true,
   };
 }
 
@@ -130,7 +174,11 @@ export function mergeMakroAndReport1145(r1145Rows, makroRows) {
     const key = String(r.itemNo || "").trim();
     const m = key ? makroByCode.get(key) : undefined;
     if (m) {
-      merged.push(buildMatchedRow({ r1145Row: r, makroRow: m, pos: pos++ }));
+      if (isDiscontinued(m)) {
+        merged.push(buildDiscontinuedRow({ r1145Row: r, makroRow: m, pos: pos++ }));
+      } else {
+        merged.push(buildMatchedRow({ r1145Row: r, makroRow: m, pos: pos++ }));
+      }
       usedCodes.add(key);
     } else {
       merged.push(buildNoInfoRow({ r1145Row: r, pos: pos++ }));
@@ -145,9 +193,12 @@ export function mergeMakroAndReport1145(r1145Rows, makroRows) {
   }
 
   const summary = {
-    total:    merged.length,
-    matched:  merged.filter((m) => m.__source === "matched").length,
-    noInfo:   merged.filter((m) => m.__source === "no-info").length,
+    total:        merged.length,
+    // "matched" = price actually updated (found AND active). Discontinued rows
+    // matched too but kept the 1145 price, so they're counted separately.
+    matched:      merged.filter((m) => m.__source === "matched" && !m.__discontinued).length,
+    discontinued: merged.filter((m) => m.__discontinued).length,
+    noInfo:       merged.filter((m) => m.__source === "no-info").length,
     makroOnly,
   };
 
