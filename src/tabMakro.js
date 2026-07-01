@@ -239,6 +239,11 @@ export function initMakroTab() {
     );
     state.invalidCells = invalidCells;
 
+    // Per the business: warnings (e.g. "Scaled price blank → used the 1145
+    // price") should report a TOTAL count only, not list every row number.
+    // The count is already in the message ("N row(s)…"); strip the "(rows: …)".
+    const cleanWarnings = warnings.map((w) => w.replace(/\s*\(rows:[^)]*\)/gi, ""));
+
     renderPreview(rows, invalidCells);
 
     const makroOnlyNote = summary.makroOnly > 0
@@ -254,8 +259,8 @@ export function initMakroTab() {
 
     if (errors.length) {
       const list = errors.map((e) => `<li>${escapeHtml(e).replace(/\n/g, "<br>")}</li>`).join("");
-      const warnList = warnings.length
-        ? `<p style="margin-top:10px"><strong>Warnings:</strong></p><ul>${warnings.map((w) => `<li>${escapeHtml(w)}</li>`).join("")}</ul>`
+      const warnList = cleanWarnings.length
+        ? `<p style="margin-top:10px"><strong>Warnings:</strong></p><ul>${cleanWarnings.map((w) => `<li>${escapeHtml(w)}</li>`).join("")}</ul>`
         : "";
       setStatus("error",
         summaryHtml +
@@ -265,8 +270,8 @@ export function initMakroTab() {
       return;
     }
 
-    if (warnings.length) {
-      const list = warnings.map((w) => `<li>${escapeHtml(w)}</li>`).join("");
+    if (cleanWarnings.length) {
+      const list = cleanWarnings.map((w) => `<li>${escapeHtml(w)}</li>`).join("");
       setStatus("warn", summaryHtml + `<p style="margin-top:10px"><strong>Warnings:</strong></p><ul>${list}</ul>`);
     } else {
       setStatus("success", summaryHtml + `<p style="margin-top:6px">All rows validated successfully.</p>`);
@@ -295,26 +300,51 @@ export function initMakroTab() {
 
   // Full-data modal — all fields + the Makro-specific calc columns, mirroring
   // the VBA Calculate_Page layout so the user sees the same data as the workbook.
+  //
+  // Column-group highlighting:
+  //   red    (makro-*) = raw data pulled straight from the Makro file
+  //   yellow (vat-*)   = values produced by the VBA VAT calculation
+  // Headers are always tinted; cells are tinted only on rows that actually
+  // carry Makro data (matched rows) — "No Information" rows stay plain.
+  const MAKRO_HDR = "makro-header";
+  const VAT_HDR   = "vat-header";
+  const makroCell = (r) => (r.__source === "matched" ? "makro-cell" : "");
+  const vatCell   = (r) => (r.__source === "matched" ? "vat-cell" : "");
+  const fmtPct = (r) =>
+    typeof r.__makroVatPct === "number" ? `${(r.__makroVatPct * 100).toFixed(2)}%` : "";
+
   const FULL_COLS = [
-    { key: "pos",             label: "#" },
-    { key: "itemNo",          label: "Article no." },
-    { key: "ean",             label: "GTIN" },
-    { key: "descGB",          label: "Item name (English)" },
-    { key: "descExtra",       label: "Item name (Local)" },
-    { key: "ou",              label: "OU" },
-    { key: "cu",              label: "CU" },
-    { key: "cuou",            label: "Packaging unit" },
-    { key: "__oldPrice",      label: "Old Price/OU" },
-    { key: "__makroName",     label: "Makro name (ชื่อสินค้า)" },
-    { key: "__makroExVat",    label: "ราคาขาย (Ex. VAT)" },
-    { key: "__makroVat",      label: "VAT" },
-    { key: "__makroInVat",    label: "ราคาขาย (In. VAT)" },
-    { key: "__makroExVatAdj", label: "Price Ex. VAT (Adj)" },
-    { key: "priceOU",         label: "New Price/OU" },
-    { key: "__diff",          label: "Diff (Old − New)" },
-    { key: "origin",          label: "Country of origin" },
-    { key: "availability",    label: "Lead time (Adj)" },
-    { key: "customerId",      label: "Customer ID" },
+    // ----- From Report 1145 -----
+    { key: "pos",        label: "#" },
+    { key: "itemNo",     label: "Article no." },
+    { key: "ean",        label: "GTIN" },
+    { key: "descGB",     label: "Item name (English)" },
+    { key: "descExtra",  label: "Item name (Local)" },
+    { key: "ou",         label: "OU" },
+    { key: "cu",         label: "CU" },
+    { key: "cuou",       label: "Packaging unit" },
+    { key: "origin",     label: "Country of origin" },
+    { key: "__oldPrice", label: "Old Price/OU (1145)" },
+    // ----- Raw Makro data (red) -----
+    { key: "__makroArtGroup", label: "Art. Group",       headerClass: MAKRO_HDR, cellClass: makroCell },
+    { key: "__makroName",     label: "ชื่อสินค้า (Makro)",  headerClass: MAKRO_HDR, cellClass: makroCell },
+    { key: "__makroExVat",    label: "ราคาขาย (Ex. VAT)",  headerClass: MAKRO_HDR, cellClass: makroCell },
+    { key: "__makroVat",      label: "VAT",              headerClass: MAKRO_HDR, cellClass: makroCell },
+    { key: "__makroInVat",    label: "ราคาขาย (In. VAT)",  headerClass: MAKRO_HDR, cellClass: makroCell },
+    { key: "__makroStatus",   label: "สถานะ",             headerClass: MAKRO_HDR, cellClass: makroCell },
+    // ----- VAT calculation (yellow) -----
+    { key: "__makroVatPct",        label: "VAT%",                   headerClass: VAT_HDR, cellClass: vatCell, cellHtml: fmtPct },
+    { key: "__makroPriceExVat",    label: "Price Exclude VAT",      headerClass: VAT_HDR, cellClass: vatCell },
+    { key: "__makroPriceInVat",    label: "Price Include VAT",      headerClass: VAT_HDR, cellClass: vatCell },
+    { key: "__makroDiffDecimal",   label: "Diff (Decimal)",         headerClass: VAT_HDR, cellClass: vatCell },
+    { key: "__makroExVatAdj",      label: "Price Exclude VAT(Adj)", headerClass: VAT_HDR, cellClass: vatCell },
+    { key: "__makroPriceInVatAdj", label: "Price Include VAT(Adj)", headerClass: VAT_HDR, cellClass: vatCell },
+    { key: "__makroCheckDiff",     label: "Check Diff",             headerClass: VAT_HDR, cellClass: vatCell },
+    // ----- Result -----
+    { key: "priceOU",      label: "New Price/OU" },
+    { key: "__diff",       label: "Diff (Old − New)" },
+    { key: "availability", label: "Lead time (Adj)" },
+    { key: "customerId",   label: "Customer ID" },
     {
       key: "status",
       label: "Status",

@@ -182,7 +182,10 @@ export function parseMakroFile(aoa) {
       itemName:   getText(src, resolved, "itemName"),
       artGroup:   getText(src, resolved, "artGroup"),
       status:     getText(src, resolved, "status"),
-      priceExVat: getNum(src, resolved, "priceExVat"),  // display only
+      // Raw "ราคาขาย (Ex. VAT)" from the file (display only). Named `srcExVat`
+      // so the `...calc` spread's computed `priceExVat` (I) doesn't clobber it —
+      // the two are usually equal but semantically distinct columns.
+      srcExVat:   getNum(src, resolved, "priceExVat"),
       vatAmt,
       inVat,
       ...calc,

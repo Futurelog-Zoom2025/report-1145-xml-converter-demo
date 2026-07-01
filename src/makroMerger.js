@@ -55,13 +55,21 @@ function buildMatchedRow({ r1145Row, makroRow, pos }) {
     __oldPrice:   oldPrice,
     __newPrice:   newPrice,
     __diff:       oldPrice - newPrice,   // AC = old - new
-    __makroName:      makroRow.itemName,
-    __makroExVat:     makroRow.priceExVat,
-    __makroVat:       makroRow.vatAmt,
-    __makroInVat:     makroRow.inVat,
-    __makroExVatAdj:  makroRow.priceExVatAdj,   // L (raw)
-    __makroStatus:    makroRow.status,
+    // ----- Raw Makro columns (red in the full-data view) -----
     __makroArtGroup:  makroRow.artGroup,
+    __makroName:      makroRow.itemName,
+    __makroExVat:     makroRow.srcExVat,         // ราคาขาย (Ex. VAT) — raw from file
+    __makroVat:       makroRow.vatAmt,           // VAT amount
+    __makroInVat:     makroRow.inVat,            // ราคาขาย (In. VAT)
+    __makroStatus:    makroRow.status,           // สถานะ
+    // ----- VAT calculation columns (yellow in the full-data view) -----
+    __makroVatPct:        makroRow.vatPct,        // H  VAT%
+    __makroPriceExVat:    makroRow.priceExVat,    // I  Price Exclude VAT
+    __makroPriceInVat:    makroRow.priceInVat,    // J  Price Include VAT
+    __makroDiffDecimal:   makroRow.diffDecimal,   // K  Diff (Decimal)
+    __makroExVatAdj:      makroRow.priceExVatAdj, // L  Price Exclude VAT(Adj)  ← new price basis
+    __makroPriceInVatAdj: makroRow.priceInVatAdj, // M  Price Include VAT(Adj)
+    __makroCheckDiff:     makroRow.checkDiff,     // N  Check Diff
     status:   MAKRO_STATUS.MATCHED,
     __source: "matched",
   };
@@ -81,13 +89,20 @@ function buildNoInfoRow({ r1145Row, pos }) {
     __oldPrice:   oldPrice,
     __newPrice:   "",
     __diff:       "",
+    // Raw Makro + VAT-calc columns are empty for rows with no Makro match.
+    __makroArtGroup:  "",
     __makroName:      "",
     __makroExVat:     "",
     __makroVat:       "",
     __makroInVat:     "",
-    __makroExVatAdj:  "",
     __makroStatus:    "",
-    __makroArtGroup:  "",
+    __makroVatPct:        "",
+    __makroPriceExVat:    "",
+    __makroPriceInVat:    "",
+    __makroDiffDecimal:   "",
+    __makroExVatAdj:      "",
+    __makroPriceInVatAdj: "",
+    __makroCheckDiff:     "",
     status:   MAKRO_STATUS.NO_INFO,
     __source: "no-info",
   };

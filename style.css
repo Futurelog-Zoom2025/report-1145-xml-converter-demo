@@ -714,6 +714,16 @@ td.warn-cell { background: var(--warn-bg); }
   color: var(--accent-hover);
 }
 
+/* Full-data column-group highlights (Makro tab):
+   red    = columns pulled straight from the Makro file
+   yellow = columns produced by the VBA VAT calculation */
+.full-table thead th.makro-header { background: #f6c9c9; color: #8a1f1f; }
+.full-table thead th.vat-header   { background: #ffe89a; color: #7a5510; }
+.full-table th.sortable.makro-header:hover { background: #f1b4b4; color: #7a1a1a; }
+.full-table th.sortable.vat-header:hover   { background: #ffe07a; color: #6a4a0d; }
+.full-table tbody td.makro-cell { background: #fdecec; }
+.full-table tbody td.vat-cell   { background: #fff7db; }
+
 /* "Errors only" toggle shown in the modal header */
 .error-toggle {
   display: inline-flex;
@@ -847,16 +857,18 @@ a { color: var(--primary); }
 }
 .tab {
   flex: 1;
-  padding: 10px 16px;
+  padding: 10px 12px;
   border-radius: var(--radius-xs);
   text-align: center;
   cursor: pointer;
   background: transparent;
   border: none;
   font-family: var(--font);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--muted);
+  /* Keep each tab label on a single line (no wrapping to 2 rows). */
+  white-space: nowrap;
   transition: color 0.15s, background 0.15s, box-shadow 0.15s;
 }
 .tab.active {
