@@ -19,7 +19,7 @@
 //   matched   → price = Round(Makro L, 2)   (Makro.newPrice); lead time = "1"
 //   unmatched → price = old 1145 price;      lead time = "0"; flagged "No Information"
 
-import { vbaRound } from "./makroParser.js";
+import { vbaRound, clean2 } from "./makroParser.js";
 
 // Status labels carried on each merged row (single-status shape, like P2P).
 export const MAKRO_STATUS = {
@@ -84,7 +84,7 @@ function buildMatchedRow({ r1145Row, makroRow, pos }) {
     // Preview / full-data extras
     __oldPrice:   oldPrice,
     __newPrice:   newPrice,
-    __diff:       oldPrice - newPrice,   // AC = old - new
+    __diff:       clean2(oldPrice - newPrice),   // AC = old - new (dust snapped to 0)
     ...makroDisplayFields(makroRow),
     status:   MAKRO_STATUS.MATCHED,
     __source: "matched",

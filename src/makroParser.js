@@ -83,6 +83,17 @@ export function vbaRound(value, digits = 0) {
   return (sign * r) / m;
 }
 
+// Round to 2 decimals and normalize -0 → +0. Used to tidy the tiny
+// floating-point residues in the diagnostic diff columns (Diff (Decimal),
+// Check Diff) so the UI/export show a consistent "0" instead of a mix of
+// 0 / 0.00 / -0.00. These columns are mathematically ~0 anyway, and the
+// exported price is unaffected (it comes from the raw values).
+export function clean2(v) {
+  if (typeof v !== "number" || !Number.isFinite(v)) return v;
+  const r = Math.round(v * 100) / 100;
+  return r === 0 ? 0 : r;   // r === 0 also catches -0, so we return a clean +0
+}
+
 /**
  * Run the VBA VAT calculation for a single row.
  * @param {number} vatAmt   VAT amount per unit (column F)
@@ -93,18 +104,21 @@ export function computeVat(vatAmt, inVat) {
   const vatPct = vatAmt === 0 ? 0 : VAT_RATE;   // H
   const priceExVat = vbaRound(inVat / (1 + vatPct), 2);  // I
   const priceInVat = vbaRound(vatAmt + priceExVat, 2);   // J
-  const diffDecimal = priceInVat - inVat;                // K (not rounded)
-  const priceExVatAdj = priceExVat - diffDecimal;        // L (not rounded) ← new price basis
-  const priceInVatAdj = priceExVatAdj + vatAmt;          // M (not rounded)
-  const checkDiff = priceInVatAdj - inVat;               // N (not rounded)
+  const diffDecimal = priceInVat - inVat;                // K (raw — feeds L below)
+  const priceExVatAdj = priceExVat - diffDecimal;        // L (raw) ← new price basis
+  const priceInVatAdj = priceExVatAdj + vatAmt;          // M (raw)
+  const checkDiff = priceInVatAdj - inVat;               // N (raw)
   return {
     vatPct,
     priceExVat,
     priceInVat,
-    diffDecimal,
+    // L and M keep their raw values (L feeds the exported price). K and N are
+    // diagnostic-only and mathematically ~0, so we tidy their floating-point
+    // dust to a clean 0 for display/export.
+    diffDecimal: clean2(diffDecimal),
     priceExVatAdj,
     priceInVatAdj,
-    checkDiff,
+    checkDiff: clean2(checkDiff),
     // The value looked up into Report 1145 = ROUND(L, 2).
     newPrice: vbaRound(priceExVatAdj, 2),
   };

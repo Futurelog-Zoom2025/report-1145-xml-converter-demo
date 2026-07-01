@@ -415,7 +415,9 @@ export function initMakroTab() {
   }
 
   function diffText(r) {
-    return typeof r.__diff === "number" ? r.__diff.toFixed(2) : "—";
+    const v = r.__diff;
+    if (typeof v !== "number" || !Number.isFinite(v)) return "—";
+    return v === 0 ? "0" : v.toFixed(2);   // __diff is already snapped to a clean 0
   }
 
   function renderPreview(rows, invalidCells = new Map()) {
