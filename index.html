@@ -335,10 +335,16 @@
               <h2 style="margin-bottom:4px">Data Preview</h2>
               <p class="muted small" id="makroPreviewSummary" style="margin:0"></p>
             </div>
-            <button type="button" id="makroShowFullBtn" class="btn btn-ghost btn-sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><path d="M3 8V3h5M21 8V3h-5M3 16v5h5M21 16v5h-5"/></svg>
-              Show Full Data
-            </button>
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+              <button type="button" id="makroUnmatchedBtn" class="btn btn-ghost btn-sm" disabled title="Makro products with no matching Report 1145 article">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+                Makro not in 1145
+              </button>
+              <button type="button" id="makroShowFullBtn" class="btn btn-ghost btn-sm">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><path d="M3 8V3h5M21 8V3h-5M3 16v5h5M21 16v5h-5"/></svg>
+                Show Full Data
+              </button>
+            </div>
           </div>
           <div class="preview-table-wrap">
             <table id="makroPreviewTable" class="preview-table"></table>

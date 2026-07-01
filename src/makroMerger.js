@@ -185,12 +185,16 @@ export function mergeMakroAndReport1145(r1145Rows, makroRows) {
     }
   }
 
-  // Makro codes never matched to any 1145 article — informational only (these
-  // do not appear in the output, matching the VBA's 1145-driven XLOOKUP).
-  let makroOnly = 0;
-  for (const key of makroByCode.keys()) {
-    if (!usedCodes.has(key)) makroOnly++;
+  // Makro codes never matched to any 1145 article. These don't appear in the
+  // XML output (the VBA's XLOOKUP is 1145-driven), but we return them so the UI
+  // can list them in a separate viewer. Deduped by product code, matching the
+  // lookup semantics; a sequential `pos` is added for display.
+  const makroOnlyRows = [];
+  let posU = 1;
+  for (const [key, m] of makroByCode) {
+    if (!usedCodes.has(key)) makroOnlyRows.push({ ...m, pos: posU++ });
   }
+  const makroOnly = makroOnlyRows.length;
 
   const summary = {
     total:        merged.length,
@@ -202,5 +206,5 @@ export function mergeMakroAndReport1145(r1145Rows, makroRows) {
     makroOnly,
   };
 
-  return { rows: merged, summary };
+  return { rows: merged, summary, makroOnlyRows };
 }

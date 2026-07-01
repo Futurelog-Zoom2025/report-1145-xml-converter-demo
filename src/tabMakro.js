@@ -45,6 +45,7 @@ export function initMakroTab() {
     previewSummary: $("#makroPreviewSummary"),
     previewTable:   $("#makroPreviewTable"),
     showFullBtn:    $("#makroShowFullBtn"),
+    unmatchedBtn:   $("#makroUnmatchedBtn"),
     // Params
     supplierNo:     $("#makroSupplierNo"),
     language:       $("#makroLanguage"),
@@ -67,9 +68,19 @@ export function initMakroTab() {
     makroParsed: null,  // {rows, sheetName, totalSheets}
     r1145Rows: null,    // rows[]
     mergedRows: [],
+    makroOnlyRows: [],  // Makro products with no matching 1145 article
     invalidCells: new Map(),
     summary: null,
   };
+
+  // Enable/label the "Makro not in 1145" button from the current unmatched count.
+  function updateUnmatchedBtn() {
+    const n = state.makroOnlyRows.length;
+    els.unmatchedBtn.disabled = n === 0;
+    els.unmatchedBtn.innerHTML =
+      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>` +
+      `Makro not in 1145${n ? ` (${n})` : ""}`;
+  }
 
   // ---------- Status + generate gating ----------
   function setStatus(kind, html) {
@@ -109,8 +120,10 @@ export function initMakroTab() {
     state.makroParsed = null;
     state.r1145Rows = null;
     state.mergedRows = [];
+    state.makroOnlyRows = [];
     state.invalidCells = new Map();
     state.summary = null;
+    updateUnmatchedBtn();
     els.fileInput.value = "";
     els.r1145FileInput.value = "";
     els.fileInfo.classList.add("hidden");
@@ -222,14 +235,16 @@ export function initMakroTab() {
       return;
     }
 
-    const { rows, summary } = await runWithLoading(
+    const { rows, summary, makroOnlyRows } = await runWithLoading(
       "Merging Makro prices with Report 1145…",
       `Matching ${state.r1145Rows.length.toLocaleString()} Report 1145 articles against ${state.makroParsed.rows.length.toLocaleString()} Makro prices.`,
       () => mergeMakroAndReport1145(state.r1145Rows, state.makroParsed.rows),
     );
 
     state.mergedRows = rows;
+    state.makroOnlyRows = makroOnlyRows;
     state.summary = summary;
+    updateUnmatchedBtn();
 
     // Row-level validation with dummy params (same as P2P).
     const { invalidCells, errors, warnings } = await runWithLoading(
@@ -367,6 +382,30 @@ export function initMakroTab() {
         return `<span class="status-pill ${info.cls}">${escapeHtml(info.label)}</span>`;
       },
     },
+  ];
+
+  // Columns for the "Makro not in 1145" viewer — ONLY Makro-side columns (these
+  // rows have no Report 1145 data). Keys map to raw parseMakroFile fields.
+  const fmtPctRaw = (r) => (typeof r.vatPct === "number" ? `${(r.vatPct * 100).toFixed(2)}%` : "");
+  const MAKRO_ONLY_COLS = [
+    { key: "pos",      label: "#" },
+    // ----- Raw Makro columns (red) -----
+    { key: "artCode",  label: "รหัสสินค้า",         headerClass: MAKRO_HDR, cellClass: () => "makro-cell" },
+    { key: "itemName", label: "ชื่อสินค้า",          headerClass: MAKRO_HDR, cellClass: () => "makro-cell" },
+    { key: "artGroup", label: "Art. Group",        headerClass: MAKRO_HDR, cellClass: () => "makro-cell" },
+    { key: "srcExVat", label: "ราคาขาย (Ex. VAT)",  headerClass: MAKRO_HDR, cellClass: () => "makro-cell" },
+    { key: "vatAmt",   label: "VAT",               headerClass: MAKRO_HDR, cellClass: () => "makro-cell" },
+    { key: "inVat",    label: "ราคาขาย (In. VAT)",  headerClass: MAKRO_HDR, cellClass: () => "makro-cell" },
+    { key: "status",   label: "สถานะ",              headerClass: MAKRO_HDR, cellClass: () => "makro-cell" },
+    // ----- VAT calculation (yellow) -----
+    { key: "vatPct",        label: "VAT%",                   headerClass: VAT_HDR, cellClass: () => "vat-cell", cellHtml: fmtPctRaw },
+    { key: "priceExVat",    label: "Price Exclude VAT",      headerClass: VAT_HDR, cellClass: () => "vat-cell" },
+    { key: "priceInVat",    label: "Price Include VAT",      headerClass: VAT_HDR, cellClass: () => "vat-cell" },
+    { key: "diffDecimal",   label: "Diff (Decimal)",         headerClass: VAT_HDR, cellClass: () => "vat-cell" },
+    { key: "priceExVatAdj", label: "Price Exclude VAT(Adj)", headerClass: VAT_HDR, cellClass: () => "vat-cell" },
+    { key: "priceInVatAdj", label: "Price Include VAT(Adj)", headerClass: VAT_HDR, cellClass: () => "vat-cell" },
+    { key: "checkDiff",     label: "Check Diff",             headerClass: VAT_HDR, cellClass: () => "vat-cell" },
+    { key: "newPrice",      label: "New Price (Ex.VAT Adj)", headerClass: VAT_HDR, cellClass: () => "vat-cell" },
   ];
 
   function fmtMoney(v) {
@@ -514,6 +553,20 @@ export function initMakroTab() {
       statusPillMap: STATUS_PILL,
       exportFilename: "Makro_Merge_Export",
       exportSheetName: "Makro Merge",
+    });
+  });
+
+  // "Makro not in 1145" — Makro products with no matching Report 1145 article.
+  // Reuses the full-data modal (search across all columns + Export to Excel),
+  // showing only Makro-side columns.
+  els.unmatchedBtn.addEventListener("click", () => {
+    if (!state.makroOnlyRows.length) return;
+    openFullDataModal({
+      rows: state.makroOnlyRows,
+      columns: MAKRO_ONLY_COLS,
+      loadingHint: `Preparing ${state.makroOnlyRows.length.toLocaleString()} unmatched Makro product(s).`,
+      exportFilename: "Makro_Not_In_1145",
+      exportSheetName: "Makro not in 1145",
     });
   });
 
